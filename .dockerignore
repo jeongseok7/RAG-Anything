@@ -1,0 +1,36 @@
+.git
+.gitignore
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.mypy_cache
+.ruff_cache
+*.egg-info
+dist
+build
+
+# Runtime data (mounted as volumes instead)
+rag_storage
+rag_storage_local
+rag_storage_lmstudio
+output
+output_*
+inputs
+
+# Logs
+*.log
+lightrag.log
+
+# IDE / OS
+.DS_Store
+.idea
+.vscode
+
+# Local dev
+.env
+.env.*
+!env.example

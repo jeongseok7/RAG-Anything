@@ -1,0 +1,53 @@
+# Podman/Docker compose file for RAG-Anything
+#
+# Prerequisite: Ollama (or other embedding backend) runs on the host.
+# This container connects to that server via host.docker.internal.
+#
+# Usage:
+#   podman compose up --build
+#   podman compose run --rm raganything python examples/example.py
+#   podman compose run --rm raganything bash
+#
+# Environment variables from .env are loaded via --env-file .env
+
+services:
+  raganything:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: raganything:local
+    container_name: raganything
+    ports:
+      - "${PORT:-9621}:${PORT:-9621}"
+    env_file:
+      - .env
+    environment:
+      # Host services — Ollama for embeddings
+      EMBEDDING_BINDING_HOST: ${EMBEDDING_BINDING_HOST:-http://host.docker.internal:11434}
+      NEO4J_URI: ${NEO4J_URI:-bolt://host.docker.internal:7687}
+      NEO4J_USERNAME: ${NEO4J_USERNAME:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-raganything}
+      NEO4J_DATABASE: ${NEO4J_DATABASE:-raganything}
+
+      # Model caches — mapped to host volumes
+      HF_HOME: /root/.cache/huggingface
+      MODELSCOPE_CACHE: /root/.cache/modelscope
+
+      # Container-internal paths for volumes
+      INPUT_DIR: /app/inputs
+      OUTPUT_DIR: /app/output
+      TIKTOKEN_CACHE_DIR: /app/tiktoken_cache
+
+    volumes:
+      - ./inputs:/app/inputs
+      - ./rag_storage:/app/rag_storage
+      - ./output:/app/output
+      - ./tiktoken_cache:/app/tiktoken_cache
+      - ${HF_HOME_HOST:-~/.cache/huggingface}:/root/.cache/huggingface
+      - ${MODELSCOPE_CACHE_HOST:-~/.cache/modelscope}:/root/.cache/modelscope
+
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+    tty: false
+    stdin_open: false

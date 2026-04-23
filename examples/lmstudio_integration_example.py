@@ -2,23 +2,31 @@
 LM Studio Integration Example with RAG-Anything
 
 This example demonstrates how to integrate LM Studio with RAG-Anything for local
-text document processing and querying.
+text + image document processing and querying on Apple Silicon (MLX).
+
+Defaults:
+- LLM + VLM: lmstudio-community/qwen/qwen3.6-27b-4bit (multimodal, vision tower preserved)
+- Embedding: text-embedding-qwen3-embedding-0.6b (1024-dim)
 
 Requirements:
-- LM Studio running locally with server enabled
+- LM Studio running locally with server enabled (default http://localhost:1234)
+- Both models loaded in LM Studio
 - OpenAI Python package: pip install openai
-- RAG-Anything installed: pip install raganything
+- RAG-Anything installed: pip install -e .
 
 Environment Setup:
 Create a .env file with:
 LLM_BINDING=lmstudio
-LLM_MODEL=openai/gpt-oss-20b
+LLM_MODEL=lmstudio-community/qwen/qwen3.6-27b-4bit
 LLM_BINDING_HOST=http://localhost:1234/v1
 LLM_BINDING_API_KEY=lm-studio
 EMBEDDING_BINDING=lmstudio
-EMBEDDING_MODEL=text-embedding-nomic-embed-text-v1.5
+EMBEDDING_MODEL=text-embedding-qwen3-embedding-0.6b
 EMBEDDING_BINDING_HOST=http://localhost:1234/v1
 EMBEDDING_BINDING_API_KEY=lm-studio
+EMBEDDING_DIM=1024
+
+From inside a Podman/Docker container, replace `localhost` with `host.docker.internal`.
 """
 
 import os
@@ -31,6 +39,17 @@ from openai import AsyncOpenAI
 # Load environment variables
 load_dotenv()
 
+# Neo4j graph storage defaults. User-provided env vars win (dotenv is already
+# loaded above); these only fire if a key is still unset. Defaults assume a
+# local Neo4j on bolt://localhost:7687 (Neo4j Desktop 2, Podman, brew service,
+# or any other runtime) with password "raganything". Set LIGHTRAG_GRAPH_STORAGE
+# to "NetworkXStorage" to fall back to the legacy file-based graph.
+os.environ.setdefault("LIGHTRAG_GRAPH_STORAGE", "Neo4JStorage")
+os.environ.setdefault("NEO4J_URI", "bolt://localhost:7687")
+os.environ.setdefault("NEO4J_USERNAME", "neo4j")
+os.environ.setdefault("NEO4J_PASSWORD", "raganything")
+os.environ.setdefault("NEO4J_DATABASE", "raganything")
+
 # RAG-Anything imports
 from raganything import RAGAnything, RAGAnythingConfig
 from lightrag.utils import EmbeddingFunc
@@ -38,8 +57,13 @@ from lightrag.llm.openai import openai_complete_if_cache
 
 LM_BASE_URL = os.getenv("LLM_BINDING_HOST", "http://localhost:1234/v1")
 LM_API_KEY = os.getenv("LLM_BINDING_API_KEY", "lm-studio")
-LM_MODEL_NAME = os.getenv("LLM_MODEL", "openai/gpt-oss-20b")
-LM_EMBED_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5")
+LM_MODEL_NAME = os.getenv(
+    "LLM_MODEL", "lmstudio-community/qwen/qwen3.6-27b-4bit"
+)
+LM_EMBED_MODEL = os.getenv(
+    "EMBEDDING_MODEL", "text-embedding-qwen3-embedding-0.6b"
+)
+LM_EMBED_DIM = int(os.getenv("EMBEDDING_DIM", "1024"))
 
 
 async def lmstudio_llm_model_func(
@@ -57,6 +81,52 @@ async def lmstudio_llm_model_func(
         base_url=LM_BASE_URL,
         api_key=LM_API_KEY,
         **kwargs,
+    )
+
+
+async def lmstudio_vision_model_func(
+    prompt: str,
+    system_prompt: Optional[str] = None,
+    history_messages: List[Dict] = None,
+    image_data: Optional[str] = None,
+    messages: Optional[List[Dict]] = None,
+    **kwargs,
+) -> str:
+    """Vision function for LightRAG. Reuses the multimodal LLM model."""
+    if messages:
+        return await openai_complete_if_cache(
+            model=LM_MODEL_NAME,
+            prompt="",
+            messages=messages,
+            base_url=LM_BASE_URL,
+            api_key=LM_API_KEY,
+            **kwargs,
+        )
+
+    if image_data:
+        user_content = [
+            {"type": "text", "text": prompt},
+            {
+                "type": "image_url",
+                "image_url": {"url": f"data:image/jpeg;base64,{image_data}"},
+            },
+        ]
+        msgs = []
+        if system_prompt:
+            msgs.append({"role": "system", "content": system_prompt})
+        msgs.append({"role": "user", "content": user_content})
+
+        return await openai_complete_if_cache(
+            model=LM_MODEL_NAME,
+            prompt="",
+            messages=msgs,
+            base_url=LM_BASE_URL,
+            api_key=LM_API_KEY,
+            **kwargs,
+        )
+
+    return await lmstudio_llm_model_func(
+        prompt, system_prompt, history_messages, **kwargs
     )
 
 
@@ -78,12 +148,10 @@ class LMStudioRAGIntegration:
 
     def __init__(self):
         # LM Studio configuration using standard LLM_BINDING variables
-        self.base_url = os.getenv("LLM_BINDING_HOST", "http://localhost:1234/v1")
-        self.api_key = os.getenv("LLM_BINDING_API_KEY", "lm-studio")
-        self.model_name = os.getenv("LLM_MODEL", "openai/gpt-oss-20b")
-        self.embedding_model = os.getenv(
-            "EMBEDDING_MODEL", "text-embedding-nomic-embed-text-v1.5"
-        )
+        self.base_url = LM_BASE_URL
+        self.api_key = LM_API_KEY
+        self.model_name = LM_MODEL_NAME
+        self.embedding_model = LM_EMBED_MODEL
 
         # RAG-Anything configuration
         # Use a fresh working directory each run to avoid legacy doc_status schema conflicts
@@ -91,7 +159,7 @@ class LMStudioRAGIntegration:
             working_dir=f"./rag_storage_lmstudio/{uuid.uuid4()}",
             parser="mineru",
             parse_method="auto",
-            enable_image_processing=False,
+            enable_image_processing=True,
             enable_table_processing=True,
             enable_equation_processing=True,
         )
@@ -167,8 +235,8 @@ class LMStudioRAGIntegration:
     def embedding_func_factory(self):
         """Create a completely serializable embedding function."""
         return EmbeddingFunc(
-            embedding_dim=768,  # nomic-embed-text-v1.5 default dimension
-            max_token_size=8192,  # nomic-embed-text-v1.5 context length
+            embedding_dim=LM_EMBED_DIM,  # qwen3-embedding-0.6b default: 1024
+            max_token_size=8192,
             func=lmstudio_embedding_async,
         )
 
@@ -177,10 +245,15 @@ class LMStudioRAGIntegration:
         print("Initializing RAG-Anything with LM Studio...")
 
         try:
+            graph_storage = os.environ["LIGHTRAG_GRAPH_STORAGE"]
+            print(f"🗂  Graph storage: {graph_storage} (uri={os.environ.get('NEO4J_URI','-')})")
+
             self.rag = RAGAnything(
                 config=self.config,
                 llm_model_func=lmstudio_llm_model_func,
+                vision_model_func=lmstudio_vision_model_func,
                 embedding_func=self.embedding_func_factory(),
+                lightrag_kwargs={"graph_storage": graph_storage},
             )
 
             # Compatibility: avoid writing unknown field 'multimodal_processed' to LightRAG doc_status
