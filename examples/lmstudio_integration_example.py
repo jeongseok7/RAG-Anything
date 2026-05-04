@@ -156,7 +156,7 @@ class LMStudioRAGIntegration:
         # RAG-Anything configuration
         # Use a fresh working directory each run to avoid legacy doc_status schema conflicts
         self.config = RAGAnythingConfig(
-            working_dir=f"./rag_storage_lmstudio/{uuid.uuid4()}",
+            working_dir=f"./rag_storage/{uuid.uuid4()}",
             parser="mineru",
             parse_method="auto",
             enable_image_processing=True,
@@ -279,7 +279,7 @@ class LMStudioRAGIntegration:
             print(f"📄 Processing document: {file_path}")
             await self.rag.process_document_complete(
                 file_path=file_path,
-                output_dir="./output_lmstudio",
+                output_dir="./output",
                 parse_method="auto",
                 display_stats=True,
             )

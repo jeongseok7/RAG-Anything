@@ -16,7 +16,7 @@ Linux container on macOS) and keeps the Python pipeline hermetic.
 └────────────────────────┬───────────────────┘
                          │ host.docker.internal:1234
 ┌────────────────────────▼───────────────────┐
-│  Podman container: raganything-lmstudio    │
+│  Podman container: raganything    │
 │    - Python 3.12                           │
 │    - RAG-Anything + MinerU + LibreOffice   │
 │    - HF_HOME mounted from host             │
@@ -77,8 +77,8 @@ podman compose run --rm raganything \
 Or with a specific document, modify the example to call
 `integration.process_document_example("/app/inputs/your.pdf")`.
 
-Outputs land in `./output_lmstudio/` and the knowledge graph in
-`./rag_storage_lmstudio/`.
+Outputs land in `./output/` and the knowledge graph in
+`./rag_storage/`.
 
 ## 4. Interactive shell
 

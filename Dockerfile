@@ -31,18 +31,19 @@ WORKDIR /app
 COPY pyproject.toml setup.py MANIFEST.in README.md requirements.txt ./
 COPY raganything ./raganything
 
-RUN uv pip install --system -e . \
+RUN uv pip install --system -e .[all] \
         python-dotenv \
         openai \
         PyJWT \
         passlib \
-        bcrypt
+        bcrypt \
+        docling
 
 COPY examples ./examples
 COPY scripts ./scripts
 COPY docs ./docs
 
-RUN mkdir -p /app/inputs /app/rag_storage_lmstudio /app/output_lmstudio \
+RUN mkdir -p /app/inputs /app/rag_storage /app/output \
         /root/.cache/huggingface /root/.cache/modelscope
 
 EXPOSE 9621
@@ -50,5 +51,5 @@ EXPOSE 9621
 # 기본 동작: lightrag-server 웹 UI (포트 9621)
 # 일회성 예제는 `podman compose run --rm raganything python examples/...` 로 실행
 CMD ["lightrag-server", "--host", "0.0.0.0", "--port", "9621", \
-     "--working-dir", "/app/rag_storage_lmstudio", \
+     "--working-dir", "/app/rag_storage", \
      "--input-dir", "/app/inputs"]

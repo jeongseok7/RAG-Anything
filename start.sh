@@ -10,8 +10,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$SCRIPT_DIR"
 
 SERVICE="raganything"
-CONTAINER="raganything-lmstudio"
-IMAGE="raganything-lmstudio:local"
+CONTAINER="raganything"
+IMAGE="raganything:local"
 WEB_UI_URL="http://localhost:9621"
 LM_STUDIO_URL="http://localhost:1234/v1"  # 실제 값은 아래에서 LLM_BINDING_HOST 기반으로 재계산
 
@@ -199,7 +199,7 @@ clean() {
 
 nuke() {
     hdr "완전 초기화 (이미지·볼륨 포함)"
-    printf "${C_RED}${C_BOLD}이미지와 rag_storage_lmstudio / output_lmstudio 내부 데이터가 남아있을 수 있습니다.${C_RESET}\n"
+    printf "${C_RED}${C_BOLD}이미지와 rag_storage / output 내부 데이터가 남아있을 수 있습니다.${C_RESET}\n"
     printf "${C_YELLOW}compose down + 이미지 제거를 진행합니다. 계속? [y/N] ${C_RESET}"
     read -r ans
     [[ "$ans" =~ ^[Yy]$ ]] || { info "취소됨."; return; }

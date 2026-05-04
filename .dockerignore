@@ -15,8 +15,7 @@ build
 
 # Runtime data (mounted as volumes instead)
 rag_storage
-rag_storage_local
-rag_storage_lmstudio
+rag_storage_*
 output
 output_*
 inputs
