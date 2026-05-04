@@ -98,6 +98,37 @@ services:
     tty: false
     stdin_open: false
 
+  lightrag-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    image: lightrag-mcp:local
+    container_name: raganything-mcp
+    # Localhost-only publish — no LAN/external exposure.
+    ports:
+      - "127.0.0.1:8000:8000"
+    command:
+      - python
+      - src/lightrag_mcp/main.py
+      - --mcp-transport
+      - streamable-http
+      - --mcp-host
+      - 0.0.0.0
+      - --mcp-port
+      - "8000"
+      - --mcp-streamable-http-path
+      - /mcp
+      - --mcp-stateless-http
+      - --host
+      - raganything
+      - --port
+      - "9621"
+      - --api-key
+      - ${LIGHTRAG_API_KEY:-}
+    depends_on:
+      raganything:
+        condition: service_started
+
 volumes:
   neo4j_data:
   neo4j_logs:

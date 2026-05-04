@@ -1,0 +1,35 @@
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1 \
+    DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git \
+        ca-certificates \
+        curl \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+# Pin via build arg: --build-arg LIGHTRAG_MCP_REF=<commit-sha>
+ARG LIGHTRAG_MCP_REPO=https://github.com/shemhamforash23/lightrag-mcp.git
+ARG LIGHTRAG_MCP_REF=master
+
+WORKDIR /opt
+RUN git clone "${LIGHTRAG_MCP_REPO}" lightrag-mcp \
+    && cd lightrag-mcp \
+    && git checkout "${LIGHTRAG_MCP_REF}"
+
+WORKDIR /opt/lightrag-mcp
+RUN uv pip install --system -e .
+
+EXPOSE 8000
+
+# Default args; compose.yaml overrides command: to wire host/port/api-key.
+CMD ["python", "src/lightrag_mcp/main.py", \
+     "--mcp-transport", "streamable-http", \
+     "--mcp-host", "0.0.0.0", \
+     "--mcp-port", "8000", \
+     "--mcp-streamable-http-path", "/mcp"]
